@@ -107,3 +107,4 @@ def find_all_candidates_in_genome(
         for site in detector.find_candidate_sites(chrom, seq):
             results.append(site)
     return results
+

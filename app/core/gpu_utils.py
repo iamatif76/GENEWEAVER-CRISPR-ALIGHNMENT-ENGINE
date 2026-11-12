@@ -82,3 +82,4 @@ def get_hardware_status() -> Dict[str, object]:
         "status_detail": msg,
         "details": details,
     }
+

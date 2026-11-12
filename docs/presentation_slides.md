@@ -156,3 +156,4 @@
 - **Q&A**: Opening the floor to questions from the committee.
 - **Speaker Notes**:
   > "In conclusion, GeneWeaver combines bioinformatics precision, modern software engineering, and hardware acceleration into a unified genomics tool. Thank you, and we welcome your questions."
+

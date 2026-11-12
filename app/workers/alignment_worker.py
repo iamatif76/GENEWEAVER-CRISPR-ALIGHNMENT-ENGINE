@@ -133,3 +133,4 @@ def run_alignment_job_worker(job_id: str) -> None:
             logger.error("Failed to update job status to failed: %s", str(db_err))
     finally:
         db.close()
+

@@ -75,3 +75,4 @@ def inspect_fasta(file_path: Path) -> Tuple[int, int, List[Tuple[str, int]]]:
     chrom_info = [(cid, len(seq)) for cid, seq in chroms.items()]
     total_bases = sum(length for _, length in chrom_info)
     return total_bases, len(chroms), chrom_info
+

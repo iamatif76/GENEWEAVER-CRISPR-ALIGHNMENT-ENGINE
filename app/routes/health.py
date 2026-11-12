@@ -40,3 +40,4 @@ def get_health(db: Session = Depends(get_db)):
         gpu_device_name=dev_name if gpu_avail else None,
         version="1.0.0",
     )
+

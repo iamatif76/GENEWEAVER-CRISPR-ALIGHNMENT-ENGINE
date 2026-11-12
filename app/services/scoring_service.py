@@ -49,3 +49,4 @@ def evaluate_alignment(
     score = calculate_alignment_score(total_mismatches, seed_mismatches)
     category = classify_risk(total_mismatches)
     return score, category
+

@@ -67,3 +67,4 @@ def test_pam_detector_degenerate_iupac():
     fwd_sites = [s for s in sites if s.strand == "+"]
     assert len(fwd_sites) == 1
     assert fwd_sites[0].pam == "TAG"
+

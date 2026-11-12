@@ -138,3 +138,4 @@ $$\text{Score} = \max\Big(0,\; \min\big(100,\; 100 - (\text{Total Mismatches} \t
 2. **Environment Variable Configuration**: Loaded exclusively via `python-dotenv` into typed Pydantic models.
 3. **Constant-Time Comparison**: `hmac.compare_digest` prevents timing attacks on protected endpoints.
 4. **Header Obfuscation**: The API never logs or echoes client keys in response bodies or exception messages.
+

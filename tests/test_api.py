@@ -129,3 +129,4 @@ def test_align_invalid_guide_sequence(client, auth_headers):
         headers=auth_headers
     )
     assert resp.status_code == 422
+

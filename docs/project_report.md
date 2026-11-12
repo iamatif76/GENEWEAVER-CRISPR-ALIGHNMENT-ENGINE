@@ -203,3 +203,4 @@ Performance was evaluated using `benchmark/benchmark.py`:
 
 ### 13. Conclusion
 GeneWeaver successfully provides a complete, robust, and mathematically grounded CRISPR alignment and off-target risk engine. By combining SIMD-accelerated CPU computing with optional GPU acceleration, an asynchronous FastAPI architecture, and an accessible Streamlit interface, GeneWeaver bridges high-performance computing and accessible genomics research.
+

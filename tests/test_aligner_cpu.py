@@ -88,3 +88,4 @@ def test_cpu_aligner_batch_matches_single():
     # Ranking: exact match first (highest score)
     assert batch_hits[0].score == 100.0
     assert batch_hits[0].mismatch_count == 0
+

@@ -67,3 +67,4 @@ def test_export_to_json():
     assert parsed[0]["chromosome"] == "chr1"
     assert parsed[0]["score"] == 100.0
     assert parsed[0]["risk_category"] == "Exact match"
+

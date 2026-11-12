@@ -23,3 +23,12 @@ uploads/
 
 # Streamlit config / cache
 .streamlit/
+
+
+.env
+venv/.n
+.venv/
+*.db
+uploads/
+__pycache__/
+.pytest_cache/

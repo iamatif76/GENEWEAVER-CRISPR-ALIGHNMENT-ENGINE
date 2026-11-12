@@ -144,3 +144,4 @@ Output includes memory metrics (MB) and execution times (milliseconds).
 | **Invalid guide sequence** | Character outside A, C, G, T, U | Ensure sequence contains valid nucleotide letters |
 | **FASTA Parse Error** | File format corruption | Ensure file begins with `>` header lines |
 | **GPU not utilized** | CUDA / CuPy not installed | GeneWeaver automatically falls back to CPU SIMD mode without crashing |
+

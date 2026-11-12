@@ -224,3 +224,4 @@ HTTP Status: `401 Unauthorized`
 - **Headers Returned**:
   `Content-Disposition: attachment; filename=geneweaver_alignment_{job_id}.csv`
   `Content-Type: text/csv`
+

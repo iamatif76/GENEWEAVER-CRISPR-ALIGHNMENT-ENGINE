@@ -6,7 +6,7 @@
   "high_risk_count": 2,
   "moderate_risk_count": 1,
   "low_risk_count": 1,
-  "cpu_time_seconds": 0.00171,
+  "cpu_time_seconds": 0.00153,
   "gpu_time_seconds": null,
   "speedup_factor": null,
   "memory_peak_mb": 0.12,

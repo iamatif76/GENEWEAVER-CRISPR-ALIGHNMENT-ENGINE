@@ -67,3 +67,4 @@ def get_reference_genome(genome_id: str, db: Session = Depends(get_db)):
             detail=f"Genome with ID '{genome_id}' not found."
         )
     return genome
+

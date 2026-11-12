@@ -107,3 +107,4 @@ def calculate_mismatches(
 
     total_mismatches = len(mismatch_positions)
     return total_mismatches, mismatch_positions, seed_mismatches
+

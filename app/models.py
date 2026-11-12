@@ -80,3 +80,4 @@ class Alignment(Base):
 
     # Relationships
     job = relationship("Job", back_populates="alignments")
+

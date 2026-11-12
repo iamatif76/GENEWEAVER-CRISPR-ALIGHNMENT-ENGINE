@@ -164,3 +164,4 @@ class CPUAligner:
                 all_candidates.append(site)
 
         return self.align_batch(all_candidates, batch_size=batch_size)
+

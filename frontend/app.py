@@ -446,3 +446,4 @@ with tab_about:
     | **3** | **Low-risk off-target** | Low probability of cleavage |
     | **>3** | **Minimal-risk off-target** | Filtered by default |
     """)
+

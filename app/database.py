@@ -38,3 +38,4 @@ def init_db() -> None:
     # Import models here so Base knows about all declared tables
     import app.models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+
