@@ -110,7 +110,7 @@ cp .env.example .env
 
 Your `.env` file should contain:
 ```ini
-API_KEY=YOUR_API_KEY
+API_KEY= YOUR_API_KEY
 DATABASE_URL=sqlite:///./geneweaver.db
 UPLOAD_DIR=./uploads
 HOST=0.0.0.0
@@ -202,7 +202,7 @@ curl -X GET http://localhost:8000/api/v1/genomes
 ### 3. Upload a Reference Genome
 ```bash
 curl -X POST http://localhost:8000/api/v1/genomes/upload \
-  -H "X-API-Key: pcsk_5Tu4bi_GjEHqWmozkPJfjBqKVNTqZdp82MZcQUxwsqCeis2dieDj7DYg7SDKaHsFAbGN7s" \
+  -H "X-API-Key: YOUR_API_KEY
   -F "file=@data/sample_genome.fasta" \
   -F "name=Human GRCh38 Subset"
 ```
@@ -210,7 +210,7 @@ curl -X POST http://localhost:8000/api/v1/genomes/upload \
 ### 4. Submit an Alignment Job
 ```bash
 curl -X POST http://localhost:8000/api/v1/align \
-  -H "X-API-Key: pcsk_5Tu4bi_GjEHqWmozkPJfjBqKVNTqZdp82MZcQUxwsqCeis2dieDj7DYg7SDKaHsFAbGN7s" \
+  -H "X-API-Key: YOUR_API_KEY
   -F "guide_sequence=GAGTCCGAGCAGAAGAAGAA" \
   -F "genome_id=<GENOME_ID>" \
   -F "max_mismatches=3" \
