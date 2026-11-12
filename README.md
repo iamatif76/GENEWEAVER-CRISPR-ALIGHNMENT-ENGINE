@@ -110,7 +110,7 @@ cp .env.example .env
 
 Your `.env` file should contain:
 ```ini
-API_KEY=pcsk_5Tu4bi_GjEHqWmozkPJfjBqKVNTqZdp82MZcQUxwsqCeis2dieDj7DYg7SDKaHsFAbGN7s
+API_KEY=YOUR_API_KEY
 DATABASE_URL=sqlite:///./geneweaver.db
 UPLOAD_DIR=./uploads
 HOST=0.0.0.0
