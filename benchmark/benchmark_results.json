@@ -1,0 +1,16 @@
+{
+  "positions_scanned": 5617,
+  "candidate_pams": 701,
+  "alignments_reported": 8,
+  "exact_matches": 4,
+  "high_risk_count": 2,
+  "moderate_risk_count": 1,
+  "low_risk_count": 1,
+  "cpu_time_seconds": 0.00171,
+  "gpu_time_seconds": null,
+  "speedup_factor": null,
+  "memory_peak_mb": 0.12,
+  "accuracy_percent": 100.0,
+  "gpu_available": false,
+  "hardware_info": "CPU Vectorized NumPy"
+}
