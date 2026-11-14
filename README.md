@@ -274,4 +274,11 @@ The Streamlit UI provides:
 
 ## 📜 License
 This project is licensed under the MIT License.
+## Team Development and Contribution
 
+GeneWeaver is developed collaboratively by a four-member team.
+Each contributor works on dedicated feature branches for dashboard
+development, API backend, CRISPR alignment logic, and testing.
+
+The develop branch is used for integrating and validating features
+before merging stable updates into the main branch.
