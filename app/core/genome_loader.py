@@ -1,78 +1,141 @@
+
 """
 Genome loading and validation module using Biopython SeqIO.
+
 Supports multi-chromosome and multi-contig FASTA files.
 """
 
 from pathlib import Path
 from typing import Dict, List, Tuple
+
 from Bio import SeqIO
+
 
 
 class GenomeLoadError(Exception):
     """Raised when a FASTA file fails validation or parsing."""
-    pass
+
+
+# DNA IUPAC nucleotide symbols, including ambiguous bases.
+VALID_NUCLEOTIDES = set("ACGTNRYKMSWBDHV")
+
+
+def _validate_sequence(sequence: str, record_id: str) -> str:
+    """
+    Normalize and validate a DNA sequence.
+
+    RNA U is converted to T. All other unsupported characters
+    cause a GenomeLoadError.
+    """
+    sequence = str(sequence).upper().replace("U", "T")
+
+    invalid_chars = set(sequence) - VALID_NUCLEOTIDES
+
+    if invalid_chars:
+        raise GenomeLoadError(
+            f"Sequence '{record_id}' contains invalid nucleotide "
+            f"characters: {sorted(invalid_chars)}"
+        )
+
+    if not sequence:
+        raise GenomeLoadError(
+            f"Sequence '{record_id}' is empty."
+        )
+
+    return sequence
+
+
+
+
 
 
 def load_fasta(file_path: Path) -> Dict[str, str]:
     """
-    Parse a FASTA file and return a dictionary mapping chromosome/contig ID to uppercase sequence.
-
-    Args:
-        file_path: Path to the FASTA file.
-
-    Returns:
-        Dict[str, str]: Chromosome identifier -> DNA sequence string.
-
-    Raises:
-        GenomeLoadError: If file is empty, missing, or has invalid FASTA format.
+    Load a FASTA file into a chromosome/contig dictionary.
     """
     path = Path(file_path)
+
     if not path.is_file():
-        raise GenomeLoadError(f"Genome file does not exist: {file_path}")
+        raise GenomeLoadError(f"Genome file does not exist: {path}")
 
     chromosomes: Dict[str, str] = {}
-    valid_nucleotides = set("ACGTNacgtnRYKMSWBDHVrykmswbdhv")
 
     try:
-        record_count = 0
-        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        with path.open("r", encoding="utf-8", errors="strict") as handle:
             for record in SeqIO.parse(handle, "fasta"):
-                record_count += 1
-                seq_str = str(record.seq).upper().replace("U", "T")
-                if not seq_str:
-                    continue
-
-                # Verify sequence contains biological nucleotide letters
-                # (allowing IUPAC ambiguity like N, R, Y)
-                sample = seq_str[:1000]
-                if not set(sample).issubset(valid_nucleotides):
-                    invalid_chars = set(sample) - valid_nucleotides
+                if record.id in chromosomes:
                     raise GenomeLoadError(
-                        f"Chromosome '{record.id}' contains non-nucleotide characters: {invalid_chars}"
+                        f"Duplicate FASTA sequence ID: '{record.id}'"
                     )
 
-                chromosomes[record.id] = seq_str
+                chromosomes[record.id] = _validate_sequence(
+                    record.seq, record.id
+                )
 
-        if record_count == 0 or len(chromosomes) == 0:
-            raise GenomeLoadError("FASTA file contains no valid sequence records.")
+    except GenomeLoadError:
+        raise
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise GenomeLoadError(
+            f"Failed to parse FASTA file: {exc}"
+        ) from exc
 
-        return chromosomes
+    if not chromosomes:
+        raise GenomeLoadError(
+            "FASTA file contains no valid sequence records."
+        )
 
-    except Exception as e:
-        if isinstance(e, GenomeLoadError):
-            raise
-        raise GenomeLoadError(f"Failed to parse FASTA file: {str(e)}") from e
+    return chromosomes
 
 
-def inspect_fasta(file_path: Path) -> Tuple[int, int, List[Tuple[str, int]]]:
+
+def inspect_fasta(
+    file_path: Path,
+) -> Tuple[int, int, List[Tuple[str, int]]]:
     """
-    Inspect a FASTA file to obtain summary statistics without keeping entire contents in memory.
+    Inspect a FASTA file without retaining all sequences in memory.
 
     Returns:
-        (total_bases, chromosome_count, list of (chrom_name, length))
+        (total_bases, chromosome_count, list of (chromosome_id, length))
     """
-    chroms = load_fasta(file_path)
-    chrom_info = [(cid, len(seq)) for cid, seq in chroms.items()]
-    total_bases = sum(length for _, length in chrom_info)
-    return total_bases, len(chroms), chrom_info
+    path = Path(file_path)
 
+    if not path.is_file():
+        raise GenomeLoadError(
+            f"Genome file does not exist: {path}"
+        )
+
+    total_bases = 0
+    chromosome_count = 0
+    chrom_info: List[Tuple[str, int]] = []
+    seen_ids = set()
+
+    try:
+        with path.open("r", encoding="utf-8", errors="strict") as handle:
+            for record in SeqIO.parse(handle, "fasta"):
+                if record.id in seen_ids:
+                    raise GenomeLoadError(
+                        f"Duplicate FASTA sequence ID: '{record.id}'"
+                    )
+
+                sequence = _validate_sequence(record.seq, record.id)
+
+                seen_ids.add(record.id)
+                sequence_length = len(sequence)
+
+                total_bases += sequence_length
+                chromosome_count += 1
+                chrom_info.append((record.id, sequence_length))
+
+    except GenomeLoadError:
+        raise
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise GenomeLoadError(
+            f"Failed to inspect FASTA file: {exc}"
+        ) from exc
+
+    if chromosome_count == 0:
+        raise GenomeLoadError(
+            "FASTA file contains no valid sequence records."
+        )
+
+    return total_bases, chromosome_count, chrom_info
