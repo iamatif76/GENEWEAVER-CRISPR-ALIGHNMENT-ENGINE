@@ -282,3 +282,10 @@ development, API backend, CRISPR alignment logic, and testing.
 
 The develop branch is used for integrating and validating features
 before merging stable updates into the main branch.
+## Project Maintenance and Quality Assurance
+
+GeneWeaver uses automated testing and performance benchmarking
+to maintain the reliability of its CRISPR alignment engine.
+The development team continuously improves the dashboard,
+backend services, alignment algorithms, and documentation.
+All updates are reviewed before integration into the main branch.
