@@ -5,6 +5,7 @@ from app.core.genome_loader import (
     load_fasta,
     inspect_fasta,
 )
+from app.core.genome_loader import iter_fasta_chunks
 def test_load_fasta_valid_sequences(tmp_path):
     fasta = tmp_path / "valid.fasta"
     fasta.write_text(
@@ -99,3 +100,63 @@ def test_inspect_fasta_rejects_empty_file(tmp_path):
 
     with pytest.raises(GenomeLoadError):
         inspect_fasta(fasta)
+
+def test_iter_fasta_chunks_preserves_sequence_and_overlap(tmp_path):
+    fasta = tmp_path / "chunks.fasta"
+    sequence = "ACGTACGTACGTACGTACGTACGT"
+    fasta.write_text(f">chr1\n{sequence}\n")
+
+    chunks = list(
+        iter_fasta_chunks(fasta, chunk_size=10, overlap=5)
+    )
+
+    assert chunks == [
+        ("chr1", 0, sequence[:15]),
+        ("chr1", 10, sequence[10:]),
+    ]
+
+
+def test_iter_fasta_chunks_handles_multiple_records(tmp_path):
+    fasta = tmp_path / "multiple.fasta"
+    fasta.write_text(
+        ">chr1\nACGTACGT\n"
+        ">chr2\nTTGGCCAA\n"
+    )
+
+    chunks = list(
+        iter_fasta_chunks(fasta, chunk_size=4, overlap=2)
+    )
+
+    assert chunks == [
+        ("chr1", 0, "ACGTAC"),
+        ("chr1", 4, "ACGT"),
+        ("chr2", 0, "TTGGCC"),
+        ("chr2", 4, "CCAA"),
+    ]
+
+
+def test_iter_fasta_chunks_rejects_invalid_nucleotide(tmp_path):
+    fasta = tmp_path / "invalid.fasta"
+    fasta.write_text(">chr1\nACGTXYZ\n")
+
+    with pytest.raises(GenomeLoadError):
+        list(iter_fasta_chunks(fasta, chunk_size=4, overlap=2))
+
+
+def test_iter_fasta_chunks_rejects_invalid_chunk_size(tmp_path):
+    fasta = tmp_path / "valid.fasta"
+    fasta.write_text(">chr1\nACGTACGT\n")
+
+    with pytest.raises(ValueError):
+        list(iter_fasta_chunks(fasta, chunk_size=0))
+
+
+def test_iter_fasta_chunks_rejects_duplicate_ids(tmp_path):
+    fasta = tmp_path / "duplicate.fasta"
+    fasta.write_text(
+        ">chr1\nACGT\n"
+        ">chr1\nTTGG\n"
+    )
+
+    with pytest.raises(GenomeLoadError):
+        list(iter_fasta_chunks(fasta))
