@@ -289,3 +289,11 @@ to maintain the reliability of its CRISPR alignment engine.
 The development team continuously improves the dashboard,
 backend services, alignment algorithms, and documentation.
 All updates are reviewed before integration into the main branch.
+## Continuous Improvement and Development Standards
+
+GeneWeaver follows a structured development process to improve
+code quality, maintainability, and system reliability. The team
+works on modular components, performs functional testing, and
+reviews updates before integrating them into the develop branch.
+Performance benchmarks help evaluate alignment engine improvements
+across supported execution environments.
