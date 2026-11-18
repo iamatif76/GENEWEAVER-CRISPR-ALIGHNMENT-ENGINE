@@ -1,9 +1,11 @@
+
 """
 Integration tests for FastAPI REST API endpoints, security, and job workflows.
 """
 
 import io
 import pytest
+import app.workers.alignment_worker as alignment_worker
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -129,4 +131,78 @@ def test_align_invalid_guide_sequence(client, auth_headers):
         headers=auth_headers
     )
     assert resp.status_code == 422
+
+def test_chunked_worker_finds_boundary_candidate(client, auth_headers, monkeypatch):
+    """Verify that a guide crossing a chunk boundary is found at its global coordinates."""
+
+    # Small chunks make it possible to test boundary handling with a short FASTA.
+    monkeypatch.setattr(alignment_worker, "FASTA_CHUNK_SIZE", 10)
+
+    guide = "GAGTCCGAGCAGAAGAAGAA"
+
+    # The guide starts at position 10 (1-based).
+    # Its PAM (AGG) immediately follows the guide.
+    sequence = "A" * 9 + guide + "AGG" + "A" * 10
+
+    fasta_content = (
+        f">chrBoundary Test chromosome\n{sequence}\n"
+    ).encode()
+
+    # Upload the test genome.
+    upload_resp = client.post(
+        "/api/v1/genomes/upload",
+        files={
+            "file": (
+                "boundary_test.fasta",
+                io.BytesIO(fasta_content),
+                "text/plain",
+            )
+        },
+        data={"name": "Chunk Boundary Test Genome"},
+        headers=auth_headers,
+    )
+
+    assert upload_resp.status_code == 201
+    genome_id = upload_resp.json()["id"]
+
+    # Start the alignment job.
+    align_resp = client.post(
+        "/api/v1/align",
+        data={
+            "guide_sequence": guide,
+            "genome_id": genome_id,
+            "max_mismatches": 0,
+            "pam_pattern": "NGG",
+        },
+        headers=auth_headers,
+    )
+
+    assert align_resp.status_code == 202
+    job_id = align_resp.json()["id"]
+
+    # TestClient waits for the background task to finish.
+    status_resp = client.get(f"/api/v1/jobs/{job_id}")
+
+    assert status_resp.status_code == 200
+    assert status_resp.json()["status"] == "completed"
+
+    # Retrieve the alignment results.
+    results_resp = client.get(f"/api/v1/jobs/{job_id}/results")
+
+    assert results_resp.status_code == 200
+    results = results_resp.json()
+
+    # Find the expected forward-strand boundary match.
+    boundary_hits = [
+        hit for hit in results
+        if hit["chromosome"] == "chrBoundary"
+        and hit["strand"] == "+"
+        and hit["start_position"] == 10
+        and hit["end_position"] == 32
+    ]
+
+    assert len(boundary_hits) == 1
+    assert boundary_hits[0]["mismatch_count"] == 0
+    assert boundary_hits[0]["matched_sequence"] == guide
+    assert boundary_hits[0]["pam_sequence"] == "AGG"
 
