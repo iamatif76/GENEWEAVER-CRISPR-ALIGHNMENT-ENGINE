@@ -297,3 +297,10 @@ works on modular components, performs functional testing, and
 reviews updates before integrating them into the develop branch.
 Performance benchmarks help evaluate alignment engine improvements
 across supported execution environments.
+## Documentation and Code Review Guidelines
+
+Clear documentation helps developers understand the project structure,
+features, and implementation process. Code changes should follow
+consistent naming conventions, maintain modularity, and be tested
+before submission. Team members should review updates to identify
+potential issues and ensure compatibility with existing components.
