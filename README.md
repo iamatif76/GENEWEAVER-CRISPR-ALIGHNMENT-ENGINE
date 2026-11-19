@@ -304,3 +304,10 @@ features, and implementation process. Code changes should follow
 consistent naming conventions, maintain modularity, and be tested
 before submission. Team members should review updates to identify
 potential issues and ensure compatibility with existing components.
+## Error Handling and Input Validation
+
+GeneWeaver validates user inputs before processing alignment requests.
+Invalid DNA sequences, unsupported parameters, and missing required
+fields should be handled with clear error messages. This helps users
+identify incorrect inputs and improves the reliability of API requests
+and dashboard operations.
