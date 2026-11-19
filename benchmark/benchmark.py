@@ -28,6 +28,49 @@ from app.core.aligner_gpu import GPUAligner
 from app.core.gpu_utils import check_gpu_availability
 from app.config import settings
 
+# Expected alignments in data/sample_genome.fasta for the default guide and PAM.
+# Coordinates are 1-based and inclusive.
+EXPECTED_TARGETS = {
+    ("chr1", 101, 123, "+", "GAGTCCGAGCAGAAGAAGAA", "TGG", 0, ()),
+    ("chr1", 324, 346, "+", "GCGTCCGAGCAGAAGAAGAA", "TGG", 1, (2,)),
+    ("chr1", 547, 569, "+", "GAGTCCGAGCAGAAGAAAAA", "TGG", 1, (18,)),
+    ("chr1", 770, 792, "+", "GCGTCCGAGCAGAAGAAAAA", "TGG", 2, (2, 18)),
+    ("chr1", 993, 1015, "-", "GAGTCCGAGCAGAAGAAGAA", "TGG", 0, ()),
+    ("chr1", 1216, 1238, "+", "ACGTCCGAGCAGAAGATGAA", "TGG", 3, (1, 2, 17)),
+    ("chrX", 611, 633, "+", "GAGTCCGAGCAGAAGAAGAA", "TGG", 0, ()),
+    ("chrX", 1138, 1160, "-", "GAGTCCGAGCAGAAGAAGAA", "TGG", 0, ()),
+}
+
+
+def hit_signature(hit):
+    """Return the identifying fields of an alignment hit."""
+    return (
+        hit.chromosome,
+        hit.start_position,
+        hit.end_position,
+        hit.strand,
+        hit.matched_sequence,
+        hit.pam_sequence,
+        hit.mismatch_count,
+        tuple(hit.mismatch_positions),
+    )
+
+
+def validate_ground_truth(hits):
+    """Compare actual alignment hits with the known sample ground truth."""
+    actual_targets = {hit_signature(hit) for hit in hits}
+
+    matched = EXPECTED_TARGETS & actual_targets
+    missing = EXPECTED_TARGETS - actual_targets
+    unexpected = actual_targets - EXPECTED_TARGETS
+
+    return {
+        "passed": len(matched),
+        "total": len(EXPECTED_TARGETS),
+        "accuracy_percent": len(matched) / len(EXPECTED_TARGETS) * 100,
+        "missing_targets": sorted(missing),
+        "unexpected_hits": sorted(unexpected),
+    }
 
 def run_benchmark(
     fasta_path: Path = settings.DATA_DIR / "sample_genome.fasta",
@@ -80,6 +123,7 @@ def run_benchmark(
     gpu_time = None
     speedup = None
     gpu_hits = []
+    gpu_python_peak_mem_mb = None
 
     if gpu_available:
         tracemalloc.start()
@@ -89,40 +133,52 @@ def run_benchmark(
         gpu_time = time.perf_counter() - t0_gpu
         _, gpu_peak_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
-        gpu_mem_mb = gpu_peak_mem / (1024 * 1024)
+        gpu_python_peak_mem_mb = gpu_peak_mem / (1024 * 1024)
         speedup = t_cpu / gpu_time if gpu_time > 0 else 1.0
-    else:
-        # Simulated comparative analysis or fallback
-        gpu_mem_mb = cpu_mem_mb
-        gpu_hits = cpu_hits
-
-    # 5. Accuracy Evaluation against Ground Truth
-    # On chr1 we planted:
-    # 1. Exact (+) target at ~101
-    # 2. 1-mismatch outside seed (score 90.0)
-    # 3. 1-mismatch inside seed (score 75.0)
-    # 4. 2-mismatch (score 65.0)
-    # 5. Exact (-) target
-    # 6. 3-mismatch target
+    # Count alignment results by mismatch level
     exact_count = sum(1 for h in cpu_hits if h.mismatch_count == 0)
     one_mismatch = sum(1 for h in cpu_hits if h.mismatch_count == 1)
     two_mismatch = sum(1 for h in cpu_hits if h.mismatch_count == 2)
     three_mismatch = sum(1 for h in cpu_hits if h.mismatch_count == 3)
+    # 5. Validate only when using the known reference benchmark configuration.
+    is_reference_benchmark = (
+        Path(fasta_path).resolve()
+        == (settings.DATA_DIR / "sample_genome.fasta").resolve()
+        and guide_sequence == "GAGTCCGAGCAGAAGAAGAA"
+        and max_mismatches == 3
+        and pam_pattern == "NGG"
+    )
 
-    # Ground truth validation checks
-    accuracy_tests_passed = 0
-    total_tests = 4
+    validation = None
 
-    if exact_count >= 2:  # Planted on chr1 and chrX
-        accuracy_tests_passed += 1
-    if one_mismatch >= 1:
-        accuracy_tests_passed += 1
-    if two_mismatch >= 1:
-        accuracy_tests_passed += 1
-    if any(h.strand == "-" and h.mismatch_count == 0 for h in cpu_hits):
-        accuracy_tests_passed += 1
+    if is_reference_benchmark:
+        validation = validate_ground_truth(cpu_hits)
+        accuracy_tests_passed = validation["passed"]
+        total_tests = validation["total"]
+        accuracy_percent = validation["accuracy_percent"]
 
-    accuracy_percent = (accuracy_tests_passed / total_tests) * 100.0
+        print("\nGROUND-TRUTH VALIDATION:")
+        print(f"  • Expected targets matched: {accuracy_tests_passed}/{total_tests}")
+        print(f"  • Accuracy: {accuracy_percent:.1f}%")
+        print(f"  • Missing targets: {len(validation['missing_targets'])}")
+        print(f"  • Unexpected hits: {len(validation['unexpected_hits'])}")
+
+        if validation["missing_targets"]:
+            print("  Missing target details:")
+            for target in validation["missing_targets"]:
+                print(f"    {target}")
+
+        if validation["unexpected_hits"]:
+            print("  Unexpected hit details:")
+            for target in validation["unexpected_hits"]:
+                print(f"    {target}")
+    else:
+        accuracy_tests_passed = None
+        total_tests = None
+        accuracy_percent = None
+        print("\nGROUND-TRUTH VALIDATION: N/A")
+        print("  Reason: Custom FASTA or alignment configuration.")
+
 
     print("\nBENCHMARK RESULTS SUMMARY:")
     print(f"  • Genomic Positions Scanned:   {total_positions_scanned:,} bp")
@@ -139,7 +195,14 @@ def run_benchmark(
     else:
         print(f"  • GPU Acceleration:            N/A (CUDA GPU not detected - graceful fallback)")
     print(f"  • Peak Memory Consumption:     {cpu_mem_mb:.2f} MB")
-    print(f"  • Ground-Truth Accuracy:       {accuracy_percent:.1f}% ({accuracy_tests_passed}/{total_tests} test cases)")
+    if accuracy_percent is not None:
+        print(
+            f"  • Ground-Truth Accuracy:       "
+            f"{accuracy_percent:.1f}% "
+            f"({accuracy_tests_passed}/{total_tests} targets)"
+        )
+    else:
+        print("  • Ground-Truth Accuracy:       N/A (custom configuration)")
     print("=" * 70)
 
     result_data = {
@@ -151,10 +214,31 @@ def run_benchmark(
         "moderate_risk_count": two_mismatch,
         "low_risk_count": three_mismatch,
         "cpu_time_seconds": round(t_cpu, 5),
-        "gpu_time_seconds": round(gpu_time, 5) if gpu_time else None,
-        "speedup_factor": round(speedup, 2) if speedup else None,
-        "memory_peak_mb": round(cpu_mem_mb, 2),
-        "accuracy_percent": accuracy_percent,
+        "gpu_time_seconds": round(gpu_time, 5) if gpu_time is not None else None,
+        "speedup_factor": round(speedup, 2) if speedup is not None else None,
+        "cpu_python_peak_memory_mb": round(cpu_mem_mb, 2),
+        "gpu_python_peak_memory_mb": (
+            round(gpu_python_peak_mem_mb, 2)
+            if gpu_python_peak_mem_mb is not None
+            else None
+        ),
+        "memory_measurement": "Python allocations tracked by tracemalloc",
+        "accuracy_percent": (
+            round(accuracy_percent, 2)
+            if accuracy_percent is not None
+            else None
+        ),
+        "ground_truth_validation": (
+            "passed" if validation is not None else "not_applicable"
+        ),
+        "ground_truth_targets_passed": accuracy_tests_passed,
+        "ground_truth_targets_total": total_tests,
+        "missing_targets": (
+            validation["missing_targets"] if validation is not None else None
+        ),
+        "unexpected_hits": (
+            validation["unexpected_hits"] if validation is not None else None
+        ),
         "gpu_available": gpu_available,
         "hardware_info": dev_name if gpu_available else "CPU Vectorized NumPy",
     }
