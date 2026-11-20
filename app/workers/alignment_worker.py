@@ -106,6 +106,43 @@ def run_alignment_job_worker(job_id: str) -> None:
         total_hits = 0
         batch_records = []
 
+        def align_and_store(candidate_batch):
+            """Align one bounded candidate batch and persist its hits."""
+            nonlocal total_hits
+
+            if not candidate_batch:
+                return
+
+            hits = aligner.align_batch(candidate_batch)
+
+            for hit in hits:
+                record = Alignment(
+                    job_id=job.id,
+                    chromosome=hit.chromosome,
+                    start_position=hit.start_position,
+                    end_position=hit.end_position,
+                    strand=hit.strand,
+                    matched_sequence=hit.matched_sequence,
+                    pam_sequence=hit.pam_sequence,
+                    mismatch_count=hit.mismatch_count,
+                    mismatch_positions=json.dumps(
+                        hit.mismatch_positions
+                    ),
+                    seed_mismatch_count=hit.seed_mismatch_count,
+                    score=hit.score,
+                    risk_category=hit.risk_category
+                )
+
+                batch_records.append(record)
+                total_hits += 1
+
+                if len(batch_records) >= DB_INSERT_BATCH_SIZE:
+                    db.bulk_save_objects(batch_records)
+                    db.commit()
+                    batch_records.clear()
+
+            candidate_batch.clear()
+
         for chromosome, chunk_start, chunk_sequence in iter_fasta_chunks(
             genome_path,
             chunk_size=FASTA_CHUNK_SIZE,
@@ -131,9 +168,9 @@ def run_alignment_job_worker(job_id: str) -> None:
                 chunk_sequence
             )
 
-            # 9. Keep only candidates whose starting coordinate
-            # belongs to this chunk's non-overlapping core.
-            global_candidates = []
+            # 9. Stream candidates into bounded alignment batches.
+            candidate_batch = []
+            chunk_candidate_count = 0
 
             for site in chunk_candidates:
                 local_start = site.start_position - 1
@@ -153,48 +190,14 @@ def run_alignment_job_worker(job_id: str) -> None:
                     pam=site.pam
                 )
 
-                global_candidates.append(global_site)
+                candidate_batch.append(global_site)
+                chunk_candidate_count += 1
 
-            # 10. Align candidates in manageable batches.
-            for batch_start in range(
-                0,
-                len(global_candidates),
-                ALIGNMENT_BATCH_SIZE
-            ):
-                candidate_batch = global_candidates[
-                    batch_start:
-                    batch_start + ALIGNMENT_BATCH_SIZE
-                ]
+                if len(candidate_batch) >= ALIGNMENT_BATCH_SIZE:
+                    align_and_store(candidate_batch)
 
-                hits = aligner.align_batch(candidate_batch)
-
-                # 11. Convert alignment hits into database records.
-                for hit in hits:
-                    record = Alignment(
-                        job_id=job.id,
-                        chromosome=hit.chromosome,
-                        start_position=hit.start_position,
-                        end_position=hit.end_position,
-                        strand=hit.strand,
-                        matched_sequence=hit.matched_sequence,
-                        pam_sequence=hit.pam_sequence,
-                        mismatch_count=hit.mismatch_count,
-                        mismatch_positions=json.dumps(
-                            hit.mismatch_positions
-                        ),
-                        seed_mismatch_count=hit.seed_mismatch_count,
-                        score=hit.score,
-                        risk_category=hit.risk_category
-                    )
-
-                    batch_records.append(record)
-                    total_hits += 1
-
-                    # Save records incrementally.
-                    if len(batch_records) >= DB_INSERT_BATCH_SIZE:
-                        db.bulk_save_objects(batch_records)
-                        db.commit()
-                        batch_records.clear()
+            # Align the final partial batch for this chunk.
+            align_and_store(candidate_batch)
 
             # 12. Update progress using unique genomic bases.
             processed_bases += core_length
@@ -212,7 +215,7 @@ def run_alignment_job_worker(job_id: str) -> None:
                 job_id,
                 processed_chunks,
                 chromosome,
-                len(global_candidates),
+                chunk_candidate_count,
                 total_hits
             )
 

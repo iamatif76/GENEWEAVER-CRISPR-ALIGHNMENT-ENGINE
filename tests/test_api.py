@@ -206,3 +206,75 @@ def test_chunked_worker_finds_boundary_candidate(client, auth_headers, monkeypat
     assert boundary_hits[0]["matched_sequence"] == guide
     assert boundary_hits[0]["pam_sequence"] == "AGG"
 
+
+
+def test_worker_streams_candidates_in_bounded_batches(
+    client, auth_headers, monkeypatch
+):
+    """Verify candidates are aligned in batches no larger than the limit."""
+
+    monkeypatch.setattr(alignment_worker, "ALIGNMENT_BATCH_SIZE", 2)
+
+    original_align_batch = alignment_worker.GPUAligner.align_batch
+    observed_batch_sizes = []
+
+    def spy_align_batch(self, sites, batch_size=100000):
+        observed_batch_sizes.append(len(sites))
+        return original_align_batch(
+            self, sites, batch_size=batch_size
+        )
+
+    monkeypatch.setattr(
+        alignment_worker.GPUAligner,
+        "align_batch",
+        spy_align_batch
+    )
+
+    guide = "A" * 20
+    sequence = "TTTTT".join([guide + "AGG"] * 5)
+
+    upload_resp = client.post(
+        "/api/v1/genomes/upload",
+        files={
+            "file": (
+                "batch_test.fasta",
+                io.BytesIO(
+                    f">chrBatchTest\n{sequence}\n".encode()
+                ),
+                "text/plain"
+            )
+        },
+        data={"name": "Streaming Batch Test Genome"},
+        headers=auth_headers
+    )
+
+    assert upload_resp.status_code == 201
+    genome_id = upload_resp.json()["id"]
+
+    align_resp = client.post(
+        "/api/v1/align",
+        data={
+            "guide_sequence": guide,
+            "genome_id": genome_id,
+            "max_mismatches": 0,
+            "pam_pattern": "NGG"
+        },
+        headers=auth_headers
+    )
+
+    assert align_resp.status_code == 202
+    job_id = align_resp.json()["id"]
+
+    status_resp = client.get(f"/api/v1/jobs/{job_id}")
+
+    assert status_resp.status_code == 200
+    assert status_resp.json()["status"] == "completed"
+
+    assert observed_batch_sizes == [2, 2, 1]
+
+    results_resp = client.get(
+        f"/api/v1/jobs/{job_id}/results"
+    )
+
+    assert results_resp.status_code == 200
+    assert len(results_resp.json()) == 5
