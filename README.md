@@ -311,3 +311,10 @@ Invalid DNA sequences, unsupported parameters, and missing required
 fields should be handled with clear error messages. This helps users
 identify incorrect inputs and improves the reliability of API requests
 and dashboard operations.
+## API Response Handling and Reliability
+
+GeneWeaver provides structured API responses to help clients
+understand alignment results and processing errors. Consistent
+response formats improve integration between the FastAPI backend
+and Streamlit dashboard. Clear status messages also make debugging
+and application monitoring easier during development.
