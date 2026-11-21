@@ -318,3 +318,10 @@ understand alignment results and processing errors. Consistent
 response formats improve integration between the FastAPI backend
 and Streamlit dashboard. Clear status messages also make debugging
 and application monitoring easier during development.
+## Test Execution and Validation
+
+The GeneWeaver test suite was executed to verify core application
+functionality. During the recorded local test run, 26 tests passed
+with 6 warnings. The CPU-based alignment workflow was tested
+successfully. GPU acceleration was not available for verification
+on the local development machine.
