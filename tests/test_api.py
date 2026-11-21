@@ -278,3 +278,75 @@ def test_worker_streams_candidates_in_bounded_batches(
 
     assert results_resp.status_code == 200
     assert len(results_resp.json()) == 5
+
+
+def test_worker_handles_large_candidate_stream(
+    client, auth_headers, monkeypatch
+):
+    """Verify large candidate streams use bounded alignment batches."""
+
+    monkeypatch.setattr(alignment_worker, "ALIGNMENT_BATCH_SIZE", 64)
+
+    original_align_batch = alignment_worker.GPUAligner.align_batch
+    observed_batch_sizes = []
+
+    def spy_align_batch(self, sites, batch_size=100000):
+        observed_batch_sizes.append(len(sites))
+        return original_align_batch(self, sites, batch_size=batch_size)
+
+    monkeypatch.setattr(
+        alignment_worker.GPUAligner,
+        "align_batch",
+        spy_align_batch
+    )
+
+    guide = "A" * 20
+    sequence = "TTTTT".join([guide + "AGG"] * 257)
+
+    upload_resp = client.post(
+        "/api/v1/genomes/upload",
+        files={
+            "file": (
+                "stress_test.fasta",
+                io.BytesIO(f">chrStress\n{sequence}\n".encode()),
+                "text/plain"
+            )
+        },
+        data={"name": "Streaming Stress Test Genome"},
+        headers=auth_headers
+    )
+
+    assert upload_resp.status_code == 201
+    genome_id = upload_resp.json()["id"]
+
+    align_resp = client.post(
+        "/api/v1/align",
+        data={
+            "guide_sequence": guide,
+            "genome_id": genome_id,
+            "max_mismatches": 0,
+            "pam_pattern": "NGG"
+        },
+        headers=auth_headers
+    )
+
+    assert align_resp.status_code == 202
+    job_id = align_resp.json()["id"]
+
+    status_resp = client.get(f"/api/v1/jobs/{job_id}")
+
+    assert status_resp.status_code == 200
+    assert status_resp.json()["status"] == "completed"
+
+    assert observed_batch_sizes == [64, 64, 64, 64, 1]
+
+    results_resp = client.get(
+        f"/api/v1/jobs/{job_id}/results"
+    )
+
+    assert results_resp.status_code == 200
+
+    results = results_resp.json()
+    assert len(results) == 257
+    assert len({result["start_position"] for result in results}) == 257
+    assert all(result["mismatch_count"] == 0 for result in results)
