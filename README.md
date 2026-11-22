@@ -325,3 +325,10 @@ functionality. During the recorded local test run, 26 tests passed
 with 6 warnings. The CPU-based alignment workflow was tested
 successfully. GPU acceleration was not available for verification
 on the local development machine.
+## Project Usage and Workflow
+
+Users can submit DNA sequences and guide RNA inputs through the
+application interface to perform alignment analysis. The backend
+processes requests and returns alignment results for display in
+the dashboard. This workflow supports testing, result inspection,
+and further evaluation of candidate guide sequences.
