@@ -332,3 +332,10 @@ application interface to perform alignment analysis. The backend
 processes requests and returns alignment results for display in
 the dashboard. This workflow supports testing, result inspection,
 and further evaluation of candidate guide sequences.
+## Supported Input and Sequence Requirements
+
+GeneWeaver accepts DNA sequence inputs for CRISPR alignment
+analysis. Users should provide valid nucleotide sequences and
+appropriate guide RNA information. Input validation helps prevent
+invalid data from entering the alignment workflow and supports
+consistent processing of sequence analysis requests.
