@@ -92,6 +92,8 @@ class CPUAligner:
         """
         Process candidate sites in high-throughput vectorized NumPy batches.
         """
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero.")
         if not sites:
             return []
 

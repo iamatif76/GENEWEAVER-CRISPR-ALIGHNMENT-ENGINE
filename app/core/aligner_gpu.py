@@ -54,6 +54,8 @@ class GPUAligner:
 
     def align_batch(self, sites: List[CandidateSite], batch_size: int = 100000) -> List[AlignmentHit]:
         """Align a batch of candidate sites using GPU if available, else CPU fallback."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero.")
         if not self.gpu_active:
             return self.cpu_fallback.align_batch(sites, batch_size=batch_size)
 
@@ -120,18 +122,57 @@ class GPUAligner:
             logger.error("GPU alignment encountered an error (%s); falling back to CPU.", str(e))
             return self.cpu_fallback.align_batch(sites, batch_size=batch_size)
 
+
+
     def align_genome(
         self,
         chromosomes: Dict[str, str],
         pam_pattern: str = "NGG",
         batch_size: int = 100000
     ) -> List[AlignmentHit]:
-        """Align entire genome using GPU or fallback."""
-        detector = PAMDetector(pam_pattern=pam_pattern, guide_length=self.guide_len)
-        all_candidates: List[CandidateSite] = []
+        """Align an entire genome using bounded candidate batches."""
+
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero")
+
+        detector = PAMDetector(
+            pam_pattern=pam_pattern,
+            guide_length=self.guide_len
+        )
+
+        all_hits: List[AlignmentHit] = []
+        candidate_batch: List[CandidateSite] = []
+
         for chrom, seq in chromosomes.items():
             for site in detector.find_candidate_sites(chrom, seq):
-                all_candidates.append(site)
+                candidate_batch.append(site)
 
-        return self.align_batch(all_candidates, batch_size=batch_size)
+                if len(candidate_batch) >= batch_size:
+                    batch_hits = self.align_batch(
+                        candidate_batch,
+                        batch_size=batch_size
+                    )
 
+                    all_hits.extend(batch_hits)
+                    candidate_batch.clear()
+
+        # Process the remaining partial batch.
+        if candidate_batch:
+            batch_hits = self.align_batch(
+                candidate_batch,
+                batch_size=batch_size
+            )
+            all_hits.extend(batch_hits)
+            candidate_batch.clear()
+
+        # Preserve global result ordering.
+        all_hits.sort(
+            key=lambda h: (
+                -h.score,
+                h.mismatch_count,
+                h.chromosome,
+                h.start_position
+            )
+        )
+
+        return all_hits
