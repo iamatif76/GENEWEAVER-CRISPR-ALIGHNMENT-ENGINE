@@ -54,6 +54,8 @@ class GPUAligner:
 
     def align_batch(self, sites: List[CandidateSite], batch_size: int = 100000) -> List[AlignmentHit]:
         """Align a batch of candidate sites using GPU if available, else CPU fallback."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero.")
         if not self.gpu_active:
             return self.cpu_fallback.align_batch(sites, batch_size=batch_size)
 

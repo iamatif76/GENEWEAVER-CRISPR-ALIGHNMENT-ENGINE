@@ -96,3 +96,9 @@ def test_align_genome_sorts_hits_across_batches(monkeypatch):
     assert results[0].mismatch_count == 0
     assert results[0].start_position == 3
     assert results[0].score >= results[-1].score
+@pytest.mark.parametrize("batch_size", [0, -1])
+def test_gpu_aligner_rejects_invalid_batch_size(batch_size):
+    aligner = make_aligner()
+
+    with pytest.raises(ValueError, match="batch_size"):
+        aligner.align_batch([], batch_size=batch_size)

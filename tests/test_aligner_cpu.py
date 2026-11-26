@@ -2,7 +2,7 @@
 Unit tests for CPU alignment, mismatch scoring, seed region weighting,
 and risk classification.
 """
-
+import pytest
 from app.core.aligner_cpu import CPUAligner, AlignmentHit
 from app.core.pam_detector import CandidateSite
 from app.services.scoring_service import calculate_alignment_score, classify_risk
@@ -89,3 +89,9 @@ def test_cpu_aligner_batch_matches_single():
     assert batch_hits[0].score == 100.0
     assert batch_hits[0].mismatch_count == 0
 
+@pytest.mark.parametrize("batch_size", [0, -1])
+def test_cpu_aligner_rejects_invalid_batch_size(batch_size):
+    aligner = CPUAligner(guide_sequence="A" * 20)
+
+    with pytest.raises(ValueError, match="batch_size"):
+        aligner.align_batch([], batch_size=batch_size)
