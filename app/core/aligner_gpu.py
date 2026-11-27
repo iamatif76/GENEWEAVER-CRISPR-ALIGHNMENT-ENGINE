@@ -4,7 +4,7 @@ Automatically falls back to CPUAligner when CUDA hardware or CuPy is unavailable
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional
 import numpy as np
 
 from app.core.aligner_cpu import AlignmentHit, CPUAligner
@@ -124,14 +124,19 @@ class GPUAligner:
 
 
 
-    def align_genome(
+
+    def iter_align_genome(
         self,
         chromosomes: Dict[str, str],
         pam_pattern: str = "NGG",
         batch_size: int = 100000
-    ) -> List[AlignmentHit]:
-        """Align an entire genome using bounded candidate batches."""
+    ) -> Iterator[AlignmentHit]:
+        """
+        Stream genome alignment results batch by batch.
 
+        Results are yielded in batch-processing order rather than
+        globally sorted order.
+        """
         if batch_size <= 0:
             raise ValueError("batch_size must be greater than zero")
 
@@ -140,7 +145,6 @@ class GPUAligner:
             guide_length=self.guide_len
         )
 
-        all_hits: List[AlignmentHit] = []
         candidate_batch: List[CandidateSite] = []
 
         for chrom, seq in chromosomes.items():
@@ -153,7 +157,7 @@ class GPUAligner:
                         batch_size=batch_size
                     )
 
-                    all_hits.extend(batch_hits)
+                    yield from batch_hits
                     candidate_batch.clear()
 
         # Process the remaining partial batch.
@@ -162,10 +166,30 @@ class GPUAligner:
                 candidate_batch,
                 batch_size=batch_size
             )
-            all_hits.extend(batch_hits)
+
+            yield from batch_hits
             candidate_batch.clear()
 
-        # Preserve global result ordering.
+    def align_genome(
+        self,
+        chromosomes: Dict[str, str],
+        pam_pattern: str = "NGG",
+        batch_size: int = 100000
+    ) -> List[AlignmentHit]:
+        """
+        Align an entire genome and return globally sorted results.
+
+        This compatibility method collects all streamed results,
+        so its total result memory usage is not bounded.
+        """
+        all_hits = list(
+            self.iter_align_genome(
+                chromosomes,
+                pam_pattern=pam_pattern,
+                batch_size=batch_size
+            )
+        )
+
         all_hits.sort(
             key=lambda h: (
                 -h.score,
