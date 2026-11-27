@@ -35,39 +35,79 @@ def test_align_genome_returns_empty_list_for_empty_genome():
 
 
 @pytest.mark.parametrize("batch_size", [0, -1])
-def test_align_genome_rejects_invalid_batch_size(batch_size):
+def test_iter_align_genome_rejects_invalid_batch_size(batch_size):
     aligner = make_aligner()
 
     with pytest.raises(ValueError, match="batch_size"):
-        aligner.align_genome({"chr1": "A" * 100}, batch_size=batch_size)
-
-
-def test_align_genome_processes_full_and_partial_batches(monkeypatch):
+        list(
+            aligner.iter_align_genome(
+                {"chr1": "A" * 100},
+                batch_size=batch_size,
+            )
+        )
+def test_iter_align_genome_processes_full_and_partial_batches(monkeypatch):
     aligner = make_aligner()
-
-    sites = [make_site(position) for position in range(1, 6)]
+    sites = [make_site(i * 23) for i in range(5)]
+    batch_sizes = []
 
     def fake_find_candidate_sites(self, chromosome, sequence):
         yield from sites
 
+    def fake_align_batch(batch, batch_size=100000):
+        batch_sizes.append(len(batch))
+        return list(batch)
+
     monkeypatch.setattr(
         "app.core.aligner_gpu.PAMDetector.find_candidate_sites",
-        fake_find_candidate_sites,
+        fake_find_candidate_sites
+    )
+    monkeypatch.setattr(aligner, "align_batch", fake_align_batch)
+
+    results = list(
+        aligner.iter_align_genome({"chr1": "A"}, batch_size=2)
     )
 
-    original_align_batch = aligner.align_batch
-    batch_sizes = []
-
-    def recording_align_batch(candidate_sites, batch_size=100000):
-        batch_sizes.append(len(candidate_sites))
-        return original_align_batch(candidate_sites, batch_size=batch_size)
-
-    monkeypatch.setattr(aligner, "align_batch", recording_align_batch)
-
-    results = aligner.align_genome({"chr1": "A" * 100}, batch_size=2)
-
+    assert results == sites
     assert batch_sizes == [2, 2, 1]
-    assert len(results) == 5
+
+
+def test_iter_align_genome_processes_batches_lazily(monkeypatch):
+    aligner = make_aligner()
+    sites = [make_site(i * 23) for i in range(4)]
+    processed_batches = []
+
+    def fake_find_candidate_sites(self, chromosome, sequence):
+        yield from sites
+
+    def fake_align_batch(batch, batch_size=100000):
+        processed_batches.append(len(batch))
+        return list(batch)
+
+    monkeypatch.setattr(
+        "app.core.aligner_gpu.PAMDetector.find_candidate_sites",
+        fake_find_candidate_sites
+    )
+    monkeypatch.setattr(aligner, "align_batch", fake_align_batch)
+
+    results = aligner.iter_align_genome(
+        {"chr1": "A"},
+        batch_size=2
+    )
+
+    # Creating the iterator must not process any candidates.
+    assert processed_batches == []
+
+    # The first request processes only the first batch.
+    assert next(results) == sites[0]
+    assert processed_batches == [2]
+
+    # The second result comes from the already processed batch.
+    assert next(results) == sites[1]
+    assert processed_batches == [2]
+
+    # Requesting another result triggers the next batch.
+    assert next(results) == sites[2]
+    assert processed_batches == [2, 2]
 
 
 def test_align_genome_sorts_hits_across_batches(monkeypatch):
